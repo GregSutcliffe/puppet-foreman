@@ -9,10 +9,27 @@ class foreman::puppetmaster (
   $puppet_basedir = $foreman::params::puppet_basedir,
   $ssl_ca         = $foreman::params::client_ssl_ca,
   $ssl_cert       = $foreman::params::client_ssl_cert,
-  $ssl_key        = $foreman::params::client_ssl_key
+  $ssl_key        = $foreman::params::client_ssl_key,
+  $enc_api        = 'UNSET',
+  $report_api     = 'UNSET'
 ) inherits foreman::params {
 
+  case $::operatingsystem {
+    Debian,Ubuntu: { $json_package = 'ruby-json' }
+    default:       { $json_package = 'rubygem-json' }
+  }
+
+  package { $json_package:
+    ensure  => installed,
+  }
+
   if $reports {   # foreman reporter
+
+    $report_template = $report_api ? {
+      'UNSET' => 'foreman/foreman-report.rb.erb',
+      default => "foreman/foreman-report_${report_api}.rb.erb",
+    }
+
     exec { 'Create Puppet Reports dir':
       command => "/bin/mkdir -p ${puppet_basedir}/reports",
       creates => "${puppet_basedir}/reports"
@@ -21,7 +38,7 @@ class foreman::puppetmaster (
       mode     => '0644',
       owner    => 'root',
       group    => 'root',
-      content  => template('foreman/foreman-report.rb.erb'),
+      content  => template($report_template),
       require  => Exec['Create Puppet Reports dir'],
     }
   }
@@ -33,7 +50,8 @@ class foreman::puppetmaster (
       puppet_home => $puppet_home,
       ssl_ca      => $ssl_ca,
       ssl_cert    => $ssl_cert,
-      ssl_key     => $ssl_key
+      ssl_key     => $ssl_key,
+      enc_api    => 'UNSET',
     }
   }
 }
